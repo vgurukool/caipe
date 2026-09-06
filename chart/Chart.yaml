@@ -1,0 +1,9 @@
+apiVersion: v2
+name: caipe
+description: Helm chart for CAIPE (AI Platform Engineering) on AWS EKS via ArgoCD
+type: application
+version: 0.1.0
+appVersion: "0.5.66"
+maintainers:
+  - name: Vgurukool Platform Team
+    email: devops@vgurukool.com

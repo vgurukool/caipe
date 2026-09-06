@@ -1,0 +1,85 @@
+replicaCount: 2
+
+image:
+  repository: ghcr.io/cnoe-io/caipe-ui
+  pullPolicy: IfNotPresent
+  tag: "0.5.66"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+    # eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/caipe-irsa
+  name: ""
+
+podAnnotations: {}
+podSecurityContext: {}
+securityContext: {}
+
+service:
+  type: ClusterIP
+  port: 3000
+  targetPort: 3000
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    kubernetes.io/tls-acme: "true"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+  hosts:
+    - host: caipe.vgurukool.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: caipe-tls
+      hosts:
+        - caipe.vgurukool.com
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 200m
+    memory: 256Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 80
+
+livenessProbe:
+  httpGet:
+    path: /
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 20
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /
+    port: http
+  initialDelaySeconds: 15
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+env:
+  NODE_ENV: "production"
+  CAIPE_RELEASE_VERSION: "0.5.66"
+  CAIPE_ORG_KEY: "caipe"
+  CAIPE_UI_BASE_URL: "https://caipe.vgurukool.com"
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

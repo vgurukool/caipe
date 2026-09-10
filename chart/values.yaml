@@ -81,7 +81,7 @@ env:
   CAIPE_UI_BASE_URL: "https://caipe.vgurukool.com"
   LLM_PROVIDER: "openai"
   OPENAI_API_KEY: "sk-litellm-vgurukool-master-2026"
-  OPENAI_ENDPOINT: "http://litellm.vgurukool.svc.cluster.local:4000/v1"
+  OPENAI_ENDPOINT: "http://litellm.litellm.svc.cluster.local:4000/v1"
   OPENAI_MODEL_NAME: "gemini-2.5-flash"
 
 nodeSelector: {}

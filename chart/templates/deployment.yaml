@@ -46,6 +46,8 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ include "caipe.fullname" . }}-config
+            - secretRef:
+                name: {{ include "caipe.fullname" . }}-secret
           {{- if .Values.livenessProbe }}
           livenessProbe:
             {{- toYaml .Values.livenessProbe | nindent 12 }}

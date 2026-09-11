@@ -95,7 +95,30 @@ env:
   KEYCLOAK_URL: "http://keycloak.keycloak.svc.cluster.local/keycloak"
   KEYCLOAK_REALM: "cnoe"
   KEYCLOAK_POSTGRES_HOST: "keycloak-postgresql.keycloak.svc.cluster.local"
+  MONGODB_DATABASE: "caipe"
+  MONGODB_HOST: "caipe-mongodb"
+  MONGODB_PORT: "27017"
+  NEXT_PUBLIC_MONGODB_ENABLED: "true"
+
+mongodb:
+  enabled: true
+  image:
+    repository: mongo
+    tag: "7.0"
+    pullPolicy: IfNotPresent
+  persistence:
+    enabled: true
+    storageClass: "gp3"
+    size: 5Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
 
 nodeSelector: {}
 tolerations: []
 affinity: {}
+

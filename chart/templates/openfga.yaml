@@ -67,12 +67,16 @@ data:
 
         # Seed baseline wildcard and org member tuples so all users can read config-driven models
         baseline_tuples = [
-            {"user": "user:*", "relation": "member", "object": ORG_OBJECT},
             {"user": "organization:caipe#member", "relation": "reader", "object": "llm_model:gemini-2.5-flash"},
             {"user": "organization:caipe#member", "relation": "reader", "object": "llm_model:gpt-4o"},
             {"user": "organization:caipe#member", "relation": "reader", "object": "llm_model:gemini-1.5-flash"},
             {"user": "organization:caipe#member", "relation": "reader", "object": "llm_model:gemini-1.5-pro"},
             {"user": "organization:caipe#member", "relation": "reader", "object": "llm_model:gpt-3.5-turbo"},
+            {"user": "user:*", "relation": "reader", "object": "llm_model:gemini-2.5-flash"},
+            {"user": "user:*", "relation": "reader", "object": "llm_model:gpt-4o"},
+            {"user": "user:*", "relation": "reader", "object": "llm_model:gemini-1.5-flash"},
+            {"user": "user:*", "relation": "reader", "object": "llm_model:gemini-1.5-pro"},
+            {"user": "user:*", "relation": "reader", "object": "llm_model:gpt-3.5-turbo"},
             {"user": "organization:caipe#admin", "relation": "manager", "object": "llm_model:gemini-2.5-flash"},
             {"user": "organization:caipe#admin", "relation": "manager", "object": "llm_model:gpt-4o"},
         ]

@@ -94,6 +94,7 @@ env:
   AUDIT_LOG_BACKEND: "disabled"
   KEYCLOAK_URL: "http://keycloak.keycloak.svc.cluster.local/keycloak"
   KEYCLOAK_REALM: "cnoe"
+  KEYCLOAK_POSTGRES_HOST: "keycloak-postgresql.keycloak.svc.cluster.local"
 
 nodeSelector: {}
 tolerations: []

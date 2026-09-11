@@ -1,0 +1,112 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: dynamic-agents
+  labels:
+    app.kubernetes.io/name: dynamic-agents
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    helm.sh/chart: {{ include "caipe.chart" . }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8001
+      targetPort: 8001
+      protocol: TCP
+      name: http
+    - port: 8100
+      targetPort: 8001
+      protocol: TCP
+      name: alt-http
+  selector:
+    app.kubernetes.io/name: dynamic-agents
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dynamic-agents
+  labels:
+    app.kubernetes.io/name: dynamic-agents
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    helm.sh/chart: {{ include "caipe.chart" . }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: dynamic-agents
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: dynamic-agents
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: dynamic-agents
+          image: ghcr.io/cnoe-io/caipe-dynamic-agents:0.5.66
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8001
+              protocol: TCP
+          env:
+            - name: MONGODB_DATABASE
+              value: "caipe"
+            - name: KEYCLOAK_URL
+              value: "http://keycloak.keycloak.svc.cluster.local/keycloak"
+            - name: KEYCLOAK_REALM
+              value: "cnoe"
+            - name: OIDC_ISSUER
+              value: "https://vgurukool.com/keycloak/realms/cnoe"
+            - name: KEYCLOAK_AUDIENCE
+              value: "caipe,caipe-platform,agentgateway,account"
+            - name: OPENFGA_HTTP
+              value: "http://openfga:8080"
+            - name: OPENFGA_STORE_NAME
+              value: "caipe-openfga"
+            - name: CAIPE_API_URL
+              value: "http://caipe:3000"
+            - name: AUTHZ_SERVICE_URL
+              value: "http://caipe:3000"
+            - name: CAIPE_ORG_KEY
+              value: "caipe"
+            - name: OPENAI_ENDPOINT
+              value: "http://litellm.litellm.svc.cluster.local:4000/v1"
+            - name: OPENAI_MODEL_NAME
+              value: "gemini-2.5-flash"
+            - name: LLM_PROVIDER
+              value: "openai"
+            - name: CORS_ORIGINS
+              value: '["*"]'
+          envFrom:
+            - secretRef:
+                name: {{ include "caipe.fullname" . }}-secret
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8001
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8001
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8001
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi

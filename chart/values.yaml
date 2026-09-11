@@ -102,6 +102,9 @@ env:
   APP_CONFIG_PATH: "/etc/caipe/app-config.yaml"
   OPENFGA_HTTP: "http://openfga:8080"
   OIDC_ACCEPTED_AUDIENCES: "caipe,account"
+  WORKFLOWS_ENABLED: "true"
+  NEXT_PUBLIC_WORKFLOWS_ENABLED: "true"
+  WORKFLOW_RUNNER_ENABLED: "true"
 
 
 mongodb:

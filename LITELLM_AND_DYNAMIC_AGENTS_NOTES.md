@@ -255,6 +255,98 @@ All manifests and configuration files have been committed to `vgurukool/caipe.gi
 * `15c1dface`: Add OpenFGA in-memory service, authorization model, and baseline tuple bootstrap.
 * `e2b93c8f8`: Fix OpenFGA seed tuples to include `user:*` reader relationships for models.
 * `d103ed89f`: Enable workflows feature flags (`WORKFLOWS_ENABLED`, `NEXT_PUBLIC_WORKFLOWS_ENABLED`, `WORKFLOW_RUNNER_ENABLED`).
+* `df89a6160`: Deploy dynamic-agents service and connect CAIPE chat runtime.
+
+---
+
+## 7. Workflows Engine Feature Flag Enablement
+
+### Symptom
+Accessing the Workflows tab (`https://caipe.vgurukool.com/workflows`) previously presented a blocking placeholder message:
+```text
+🚧 Workflows not enabled
+The Workflows feature is not enabled on this instance.
+Set WORKFLOWS_ENABLED=true to activate it.
+```
+
+### Root Cause
+CAIPE gates the `/workflows` server-side layout (`ui/src/app/(app)/workflows/layout.tsx`) and the top-level navigation item behind `config.workflowsEnabled`. When `WORKFLOWS_ENABLED` is omitted or `false`, the layout renders the disabled placeholder and blocks rendering of the `WorkflowCanvas` and workflow editor.
+
+### Resolution
+1. Added environment variables to `caipe/chart/values.yaml`:
+   ```yaml
+   env:
+     WORKFLOWS_ENABLED: "true"
+     NEXT_PUBLIC_WORKFLOWS_ENABLED: "true"
+     WORKFLOW_RUNNER_ENABLED: "true"
+   ```
+2. Committed and pushed commit `d103ed89f` to `vgurukool/caipe.git`.
+3. Synced with Argo CD and rolled out the updated CAIPE pods.
+
+### Verification
+* Probing `GET http://localhost:3000/workflows` returns `HTTP 200` with `Has disabled notice: false`.
+* The `WorkflowCanvas`, step builder, run execution store, and `/api/workflow-configs` CRUD API are fully operational.
+
+---
+
+## 8. Dynamic Agents Runtime Service & Agent Chat Enablement
+
+### Symptom
+Attempting to chat with the `Hello World` agent (or any custom agent) in CAIPE resulted in:
+```json
+HTTP 503
+{
+  "success": false,
+  "error": "Dynamic agents service is not available. Please ensure it is running."
+}
+```
+
+### Root Cause
+1. CAIPE's chat interface (`/api/v1/chat/stream/start`) proxies Server-Sent Events (SSE) requests directly to the Dynamic Agents backend service (`http://dynamic-agents:8001/api/v1/chat/stream/start`).
+2. The `dynamic-agents` Python runtime service (`ghcr.io/cnoe-io/caipe-dynamic-agents:0.5.66`) was not deployed in the Kubernetes cluster.
+3. CAIPE UI caught `fetch failed: ECONNREFUSED` and returned HTTP 503.
+
+### Resolution
+1. **Manifest Creation (`caipe/chart/templates/dynamic-agents.yaml`)**:
+   - Deployed `dynamic-agents` running `ghcr.io/cnoe-io/caipe-dynamic-agents:0.5.66`.
+   - Exposed ClusterIP Service `dynamic-agents` on ports `8001` (primary API) and `8100` (legacy compatibility).
+   - Injected shared credentials via `caipe-secret` (`MONGODB_URI`, `OPENAI_API_KEY`).
+   - Injected runtime configuration:
+     - `MONGODB_DATABASE: caipe`
+     - `KEYCLOAK_URL: http://keycloak.keycloak.svc.cluster.local/keycloak`
+     - `KEYCLOAK_REALM: cnoe`
+     - `OIDC_ISSUER: https://vgurukool.com/keycloak/realms/cnoe`
+     - `KEYCLOAK_AUDIENCE: caipe,caipe-platform,agentgateway,account`
+     - `OPENFGA_HTTP: http://openfga:8080`
+     - `OPENFGA_STORE_NAME: caipe-openfga`
+     - `CAIPE_API_URL: http://caipe:3000`
+     - `AUTHZ_SERVICE_URL: http://caipe:3000`
+     - `OPENAI_ENDPOINT: http://litellm.litellm.svc.cluster.local:4000/v1`
+     - `OPENAI_MODEL_NAME: gemini-2.5-flash`
+     - `LLM_PROVIDER: openai`
+2. **CAIPE Helm Values Update (`caipe/chart/values.yaml`)**:
+   - `DYNAMIC_AGENTS_URL: "http://dynamic-agents:8001"`
+   - `DYNAMIC_AGENTS_ENABLED: "true"`
+   - `NEXT_PUBLIC_DYNAMIC_AGENTS_ENABLED: "true"`
+   - `A2A_BASE_URL: "http://dynamic-agents:8001"`
+3. **GitOps & Rollout**:
+   - Pushed commit `df89a6160` to `vgurukool/caipe.git`.
+   - Synced Argo CD and rolled out both `dynamic-agents` and `caipe` deployments.
+
+### Verification
+* **Container Health**: `dynamic-agents` pod initialized, connected to MongoDB `caipe`, created indexes and GridFS buckets, and reports `1/1 Running`.
+* **Platform Diagnostics**: `/api/platform/health?diagnostics=1` reports:
+  - `Chat Runtime`: `healthy` (`Chat runtime reachable`, 47ms)
+  - `Dynamic Agents`: `healthy` (`Runtime reachable`, 96ms)
+  - `Dynamic Agents Runtime` probe: `healthy` (`HTTP 200`)
+* **Real-time SSE Chat Stream**: Sent message `"Hello! Who are you?"` to agent `hello-world`. The agent streamed back `HTTP 200`:
+  ```text
+  event: content
+  data: {"text": "Hello! I am Hello World, a friendly default assistant for testing and validating CAIPE. How can I help you today?"}
+
+  event: done
+  data: {}
+  ```
 
 ---
 

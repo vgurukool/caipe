@@ -89,6 +89,11 @@ env:
   OIDC_CLIENT_ID: "caipe"
   OIDC_REQUIRED_GROUP: ""
   BOOTSTRAP_ADMIN_EMAILS: "user1@vgurukool.com,admin@vgurukool.com"
+  A2A_BASE_URL: "http://localhost:3000/api"
+  RAG_ENABLED: "false"
+  AUDIT_LOG_BACKEND: "disabled"
+  KEYCLOAK_URL: "http://keycloak.keycloak.svc.cluster.local/keycloak"
+  KEYCLOAK_REALM: "cnoe"
 
 nodeSelector: {}
 tolerations: []

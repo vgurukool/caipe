@@ -254,3 +254,34 @@ All manifests and configuration files have been committed to `vgurukool/caipe.gi
 * `37ff9a186`: Add MongoDB StatefulSet, persistent storage, and LiteLLM app-config model seeding.
 * `15c1dface`: Add OpenFGA in-memory service, authorization model, and baseline tuple bootstrap.
 * `e2b93c8f8`: Fix OpenFGA seed tuples to include `user:*` reader relationships for models.
+* `d103ed89f`: Enable workflows feature flags (`WORKFLOWS_ENABLED`, `NEXT_PUBLIC_WORKFLOWS_ENABLED`, `WORKFLOW_RUNNER_ENABLED`).
+
+---
+
+## 7. Workflows Engine Feature Flag Enablement
+
+### Symptom
+Accessing the Workflows tab (`https://caipe.vgurukool.com/workflows`) previously presented a blocking placeholder message:
+```text
+🚧 Workflows not enabled
+The Workflows feature is not enabled on this instance.
+Set WORKFLOWS_ENABLED=true to activate it.
+```
+
+### Root Cause
+CAIPE gates the `/workflows` server-side layout (`ui/src/app/(app)/workflows/layout.tsx`) and the top-level navigation item behind `config.workflowsEnabled`. When `WORKFLOWS_ENABLED` is omitted or `false`, the layout renders the disabled placeholder and blocks rendering of the `WorkflowCanvas` and workflow editor.
+
+### Resolution
+1. Added environment variables to `caipe/chart/values.yaml`:
+   ```yaml
+   env:
+     WORKFLOWS_ENABLED: "true"
+     NEXT_PUBLIC_WORKFLOWS_ENABLED: "true"
+     WORKFLOW_RUNNER_ENABLED: "true"
+   ```
+2. Committed and pushed commit `d103ed89f` to `vgurukool/caipe.git`.
+3. Synced with Argo CD and rolled out the updated CAIPE pods.
+
+### Verification
+* Probing `GET http://localhost:3000/workflows` returns `HTTP 200` with `Has disabled notice: false`.
+* The `WorkflowCanvas`, step builder, run execution store, and `/api/workflow-configs` CRUD API are fully operational.

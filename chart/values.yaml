@@ -99,6 +99,10 @@ env:
   MONGODB_HOST: "caipe-mongodb"
   MONGODB_PORT: "27017"
   NEXT_PUBLIC_MONGODB_ENABLED: "true"
+  APP_CONFIG_PATH: "/etc/caipe/app-config.yaml"
+  OPENFGA_HTTP: "http://openfga:8080"
+  OIDC_ACCEPTED_AUDIENCES: "caipe,account"
+
 
 mongodb:
   enabled: true

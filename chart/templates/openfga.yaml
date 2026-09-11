@@ -1,0 +1,186 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openfga-config
+  labels:
+    app.kubernetes.io/name: openfga
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    helm.sh/chart: {{ include "caipe.chart" . }}
+data:
+  authorization-model.json: |-
+{{ .Files.Get "files/authorization-model.json" | indent 4 }}
+  seed.py: |-
+    import json
+    import os
+    import sys
+    import time
+    import urllib.error
+    import urllib.request
+    from pathlib import Path
+
+    OPENFGA = os.environ.get("OPENFGA_HTTP", "http://localhost:8080").rstrip("/")
+    STORE_NAME = os.environ.get("OPENFGA_STORE_NAME", "caipe-openfga").strip()
+    ORG_OBJECT = "organization:caipe"
+
+    def request(method, path, body=None):
+        data = None
+        headers = {}
+        if body is not None:
+            data = json.dumps(body).encode("utf-8")
+            headers["Content-Type"] = "application/json"
+        req = urllib.request.Request(f"{OPENFGA}{path}", data=data, method=method, headers=headers)
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            payload = resp.read()
+            return json.loads(payload.decode("utf-8")) if payload else {}
+
+    def wait_ready():
+        for i in range(60):
+            try:
+                request("GET", "/healthz")
+                return
+            except Exception:
+                time.sleep(1)
+        raise SystemExit("OpenFGA did not become ready")
+
+    def ensure_tuple(store_id, tuple_key):
+        try:
+            allowed = request("POST", f"/stores/{store_id}/check", {"tuple_key": tuple_key}).get("allowed")
+            if allowed:
+                return
+            request("POST", f"/stores/{store_id}/write", {"writes": {"tuple_keys": [tuple_key]}})
+        except Exception as e:
+            print(f"Error ensuring tuple: {e}", file=sys.stderr)
+
+    try:
+        wait_ready()
+        stores = request("GET", "/stores").get("stores", [])
+        store_id = next((store.get("id") for store in stores if store.get("name") == STORE_NAME), None)
+        if not store_id:
+            store_id = request("POST", "/stores", {"name": STORE_NAME})["id"]
+            print(f"created store_id={store_id}")
+        else:
+            print(f"reusing store_id={store_id}")
+
+        model = json.loads(Path("/model/authorization-model.json").read_text())
+        model_id = request("POST", f"/stores/{store_id}/authorization-models", model)["authorization_model_id"]
+        print(f"authorization_model_id={model_id}")
+
+        # Seed baseline wildcard and org member tuples so all users can read config-driven models
+        baseline_tuples = [
+            {"user": "user:*", "relation": "member", "object": ORG_OBJECT},
+            {"user": "organization:caipe#member", "relation": "reader", "object": "llm_model:gemini-2.5-flash"},
+            {"user": "organization:caipe#member", "relation": "reader", "object": "llm_model:gpt-4o"},
+            {"user": "organization:caipe#member", "relation": "reader", "object": "llm_model:gemini-1.5-flash"},
+            {"user": "organization:caipe#member", "relation": "reader", "object": "llm_model:gemini-1.5-pro"},
+            {"user": "organization:caipe#member", "relation": "reader", "object": "llm_model:gpt-3.5-turbo"},
+            {"user": "organization:caipe#admin", "relation": "manager", "object": "llm_model:gemini-2.5-flash"},
+            {"user": "organization:caipe#admin", "relation": "manager", "object": "llm_model:gpt-4o"},
+        ]
+        for t in baseline_tuples:
+            ensure_tuple(store_id, t)
+        print("OpenFGA baseline tuples seeded successfully!")
+    except Exception as e:
+        print(f"OpenFGA init error: {e}", file=sys.stderr)
+
+    while True:
+        time.sleep(3600)
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: openfga
+  labels:
+    app.kubernetes.io/name: openfga
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    helm.sh/chart: {{ include "caipe.chart" . }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+      name: http
+    - port: 8081
+      targetPort: 8081
+      protocol: TCP
+      name: grpc
+  selector:
+    app.kubernetes.io/name: openfga
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openfga
+  labels:
+    app.kubernetes.io/name: openfga
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    helm.sh/chart: {{ include "caipe.chart" . }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: openfga
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: openfga
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: openfga
+          image: openfga/openfga:v1.15.1
+          imagePullPolicy: IfNotPresent
+          args: ["run"]
+          env:
+            - name: OPENFGA_DATASTORE_ENGINE
+              value: "memory"
+            - name: OPENFGA_PLAYGROUND_ENABLED
+              value: "false"
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: grpc
+              containerPort: 8081
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+        - name: openfga-init
+          image: python:3.13-slim
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-u", "/scripts/seed.py"]
+          volumeMounts:
+            - name: openfga-config
+              mountPath: /model/authorization-model.json
+              subPath: authorization-model.json
+            - name: openfga-config
+              mountPath: /scripts/seed.py
+              subPath: seed.py
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+      volumes:
+        - name: openfga-config
+          configMap:
+            name: openfga-config

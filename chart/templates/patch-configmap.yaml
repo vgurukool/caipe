@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "caipe.fullname" . }}-patch
+  labels:
+    {{- include "caipe.labels" . | nindent 4 }}
+data:
+  patch-chat.js: |
+    const fs = require('fs');
+    console.log('[patch-chat] Starting CAIPE chat routing patch...');
+
+    // 1. Process 1oxixbk0_lv7l.js
+    const p1 = '/app/.next/static/chunks/1oxixbk0_lv7l.js';
+    if (fs.existsSync(p1)) {
+      let c1 = fs.readFileSync(p1, 'utf8');
+      const targetSnippet = 'let targetAgent=null;if(typeof window!=="undefined"&&window.location.search){const sp=new URLSearchParams(window.location.search);targetAgent=sp.get("agent")||sp.get("agentId")}if(targetAgent){let ex=l.find(x=>x.agent_id===targetAgent||(x.participants&&x.participants.some(p=>p.type==="agent"&&p.id===targetAgent)));if(ex){d.current=!0,e.replace(`/chat/${ex.id}`);return}let nid=await f(targetAgent);d.current=!0,e.replace(`/chat/${nid}`);return}';
+
+      if (!c1.includes('targetAgent')) {
+        const marker = 'let{conversations:t,activeConversationId:s}=n.useChatStore.getState(),o=s??(0,n.getLastActiveConversationId)(),c=r?.user?.email,l=c?t.filter(e=>!e.owner_id||e.owner_id===c):t;';
+        if (c1.includes(marker)) {
+          c1 = c1.replace(marker, marker + targetSnippet);
+          console.log('[patch-chat] Injected targetAgent into c1');
+        } else {
+          console.warn('[patch-chat] Marker not found in 1oxixbk0_lv7l.js');
+        }
+      }
+      fs.writeFileSync('/app/.next/static/chunks/1oxixbk0_lv7l_v2.js', c1);
+      console.log('[patch-chat] Created 1oxixbk0_lv7l_v2.js');
+    }
+
+    // 2. Process 3ikz-n8jshqbb.js (AuthGuard)
+    const p2 = '/app/.next/static/chunks/3ikz-n8jshqbb.js';
+    if (fs.existsSync(p2)) {
+      let c2 = fs.readFileSync(p2, 'utf8');
+      const origLogin = 'let t=[e,u&&"/"!==u&&"/login"!==u?`callbackUrl=${encodeURIComponent(u)}`:""].filter(Boolean).join("&");';
+      const newLogin = 'let _s=("undefined"!=typeof window&&window.location.search)?window.location.search:"";let _fp=u?u+_s:"";let t=[e,_fp&&"/"!==_fp&&"/login"!==_fp?`callbackUrl=${encodeURIComponent(_fp)}`:""].filter(Boolean).join("&");';
+
+      if (c2.includes(origLogin)) {
+        c2 = c2.replace(origLogin, newLogin);
+        console.log('[patch-chat] Patched loginUrl callbackUrl in c2');
+      }
+      fs.writeFileSync('/app/.next/static/chunks/3ikz-n8jshqbb_v2.js', c2);
+      console.log('[patch-chat] Created 3ikz-n8jshqbb_v2.js');
+    }
+
+    // 3. Update server manifest so Next.js outputs the v2 chunk filenames in HTML
+    const manifestPath = '/app/.next/server/app/(app)/chat/page_client-reference-manifest.js';
+    if (fs.existsSync(manifestPath)) {
+      let m = fs.readFileSync(manifestPath, 'utf8');
+      m = m.replace(/1oxixbk0_lv7l\.js/g, '1oxixbk0_lv7l_v2.js');
+      m = m.replace(/3ikz-n8jshqbb\.js/g, '3ikz-n8jshqbb_v2.js');
+      fs.writeFileSync(manifestPath, m);
+      console.log('[patch-chat] Updated page_client-reference-manifest.js with v2 chunks');
+    }
+
+    console.log('[patch-chat] Patch completed successfully.');

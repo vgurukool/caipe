@@ -21,6 +21,7 @@ spec:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
         checksum/app-config: {{ include (print $.Template.BasePath "/app-configmap.yaml") . | sha256sum }}
+        checksum/patch: {{ include (print $.Template.BasePath "/patch-configmap.yaml") . | sha256sum }}
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -40,6 +41,11 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              node /etc/caipe-patch/patch-chat.js
+              exec /app/entrypoint.sh
           ports:
             - name: http
               containerPort: {{ .Values.service.targetPort }}
@@ -64,10 +70,17 @@ spec:
               mountPath: /etc/caipe/app-config.yaml
               subPath: app-config.yaml
               readOnly: true
+            - name: patch-script
+              mountPath: /etc/caipe-patch
+              readOnly: true
       volumes:
         - name: app-config
           configMap:
             name: {{ include "caipe.fullname" . }}-app-config
+        - name: patch-script
+          configMap:
+            name: {{ include "caipe.fullname" . }}-patch
+            defaultMode: 0755
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

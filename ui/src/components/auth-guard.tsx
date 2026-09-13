@@ -30,8 +30,10 @@ export function AuthGuard({ children }: AuthGuardProps) {
    * user returns here after re-authenticating (e.g. /chat/<uuid>).
    */
   const loginUrl = useCallback((params?: string): string => {
-    const cb = pathname && pathname !== '/' && pathname !== '/login'
-      ? `callbackUrl=${encodeURIComponent(pathname)}`
+    const search = typeof window !== 'undefined' ? window.location.search : '';
+    const fullPath = pathname ? `${pathname}${search}` : '';
+    const cb = fullPath && fullPath !== '/' && fullPath !== '/login'
+      ? `callbackUrl=${encodeURIComponent(fullPath)}`
       : '';
     const parts = [params, cb].filter(Boolean).join('&');
     return parts ? `/login?${parts}` : '/login';

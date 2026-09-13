@@ -85,7 +85,7 @@ env:
   OPENAI_MODEL_NAME: "gemini-2.5-flash"
   SSO_ENABLED: "true"
   NEXT_PUBLIC_SSO_ENABLED: "true"
-  OIDC_ISSUER: "https://vgurukool.com/keycloak/realms/cnoe"
+  OIDC_ISSUER: "https://platform.vgurukool.com/keycloak/realms/cnoe"
   OIDC_CLIENT_ID: "caipe"
   OIDC_REQUIRED_GROUP: ""
   BOOTSTRAP_ADMIN_EMAILS: "user1@vgurukool.com,admin@vgurukool.com"

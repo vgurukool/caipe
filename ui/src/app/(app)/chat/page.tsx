@@ -61,6 +61,28 @@ function ChatRedirectPage() {
         ? currentConversations.filter((c) => !c.owner_id || c.owner_id === userEmail)
         : currentConversations;
 
+      // 0. Check for target agent from URL search params (e.g. /chat?agent=kubera)
+      let targetAgent: string | null = null;
+      if (typeof window !== "undefined" && window.location.search) {
+        const params = new URLSearchParams(window.location.search);
+        targetAgent = params.get("agent") || params.get("agentId");
+      }
+
+      if (targetAgent) {
+        const matchingConv = ownedConversations.find(
+          (c) => c.agent_id === targetAgent || (c.participants && c.participants.some((p: any) => p.type === "agent" && p.id === targetAgent))
+        );
+        if (matchingConv) {
+          redirected.current = true;
+          router.replace(`/chat/${matchingConv.id}`);
+          return;
+        }
+        const newId = await createConversation(targetAgent);
+        redirected.current = true;
+        router.replace(`/chat/${newId}`);
+        return;
+      }
+
       // 1. Resume the last active conversation when it still exists in the loaded list.
       // Prefer owned entries for auto-pick below, but an explicit last-active id from
       // this browser should win to avoid spawning duplicate empty chats on /chat.

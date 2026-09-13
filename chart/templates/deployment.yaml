@@ -80,3 +80,21 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- if and .Values.topologySpread .Values.topologySpread.enabled }}
+      topologySpreadConstraints:
+        - maxSkew: {{ .Values.topologySpread.maxSkew | default 1 }}
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: {{ .Values.topologySpread.whenUnsatisfiable | default "ScheduleAnyway" }}
+          labelSelector:
+            matchLabels:
+              {{- include "caipe.selectorLabels" . | nindent 14 }}
+        - maxSkew: {{ .Values.topologySpread.maxSkew | default 1 }}
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: {{ .Values.topologySpread.whenUnsatisfiable | default "ScheduleAnyway" }}
+          labelSelector:
+            matchLabels:
+              {{- include "caipe.selectorLabels" . | nindent 14 }}
+      {{- else if .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml .Values.topologySpreadConstraints | nindent 8 }}
+      {{- end }}
